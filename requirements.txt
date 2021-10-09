@@ -1,0 +1,8 @@
+stem
+Flask
+Pillow
+pyqrcode
+pycryptodome
+tk
+PySocks
+pypng
