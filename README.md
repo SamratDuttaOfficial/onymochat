@@ -5,29 +5,29 @@
 [![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)]() [![Python Versions](https://img.shields.io/badge/Python-3.9-blue.svg)](https://github.com/SamratDuttaOfficial/onymochat) [![Release](https://img.shields.io/badge/Release-beta-red.svg)]() [![Testted_On](https://img.shields.io/badge/Tested_On-Windows_|_Linux-brightgreen.svg)]()
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/SamratDuttaOfficial/onymochat) [![PR's Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat)](https://github.com/SamratDuttaOfficial/onymochat)  
 
-Onymochat is an end-to-end encrypted, decentralized, anynomous chat application. You can also host your anonymous .onion webpage with Onymochat.
+Onymochat is an end-to-end encrypted, decentralized, anonymous chat application. You can also host your anonymous .onion webpage with Onymochat.
 
 - Onymochat works over the Tor.
 - Anyone can start their own chat server for two users from their own PC.
-- It's end to end encrypted.
+- It's end-to-end encrypted.
 - It's basically magic. ✨  
 
 ## Features
 
 - Start your own chat server for two users from your own PC.
 - Users can get connected to the chat server with authentication keys.
-- You can launch your chat client and chat with anyone who have your public key and server details (after he/she/they joins the server).
+- You can launch your chat client and chat with anyone who has your public key and server details (after he/she/they joins the server).
 - You can launch your own anonymous .onion webpage with Onymochat. You can use this anonymous website for your journalistic works and whistleblowing.
 
-You don't have to rely upon any third party app to provide you a platform/server to anonymously chat with your friend. You can host your own server and if the person you want to chat with has the server's public key and authentication key, he/she/they can join the server with his/her/their chat client and chat with you. 
+You don't have to rely upon any third-party app to provide you with a platform/server to anonymously chat with your friend. You can host your own server and if the person you want to chat with has the server's public key and authentication key, he/she/they can join the server with his/her/their chat client and chat with you. 
 
-Only two people can chat with one server. The chat data is deleted whenever the server is closed. The chat is end to end encrypted, so even if someone hacks into the server somehow, they won't be able to get to know what two people are taling about. It uses 1024 bit RSA keys for encryption. You connect to the chat server over the Tor network, which gives you anonymity. 
+Only two people can chat with one server. The chat data is deleted whenever the server is closed. The chat is end to end encrypted, so even if someone hacks into the server somehow, they won't be able to get to know what two people are talking about. It uses 1024 bit RSA keys for encryption. You connect to the chat server over the Tor network, which gives you anonymity. 
 
 ## Security
 
 Let's see what makes Onyomochat the most secure chat application (probably):
 
-- End to end 1024 bit RSA encryption for messages.
+- End-to-end 1024 bit RSA encryption for messages.
 - Version 3 Onion Service for your .onion webpage.
 - Version 2 Onion Service for your chat server.
 - Connection to server over the Tor network.
@@ -46,7 +46,7 @@ Download Python 3.9 from [here](https://www.python.org/downloads/release/python-
 
 ##### For Linux
 
-Use the following command to install Python 3.9 on your linux system.
+Use the following command to install Python 3.9 on your Linux system.
 
 ```sh
 apt-get install python3.9
@@ -122,13 +122,13 @@ After installation, open the 'onymochat' subdirectory in your terminal. This dir
 python run_onymochat.py
 ```
 
-If you are on linux, run that file using the following command instead:
+If you are on Linux, run that file using the following command instead:
 
 ```sh
 python3 run_onymochat.py
 ```
 
-This will run the onymochat program in your terminal. This will greet you with a menu. Just input the number of the option you want to go to, and hit the enter button.
+This will run the Onymochat program in your terminal. This will greet you with a menu. Just input the number of the option you want to go to, and hit the enter button.
 
 First, configure Onymochat with Tor. 
 
@@ -168,7 +168,7 @@ Here are some steps you need to follow to chat with someone through Onymochat.
 
 First, select option **1** to create a new **hidden service and server** and follow the instructions given in your terminal/command window. This will be the server where the chat data will be temporarily saved (all chat data will be lost when the hidden service and server is closed). You can press Ctrl + C to close this **hidden service and server** when you are done chatting.
 
-Then, share the hidden service public key and authentication key with someone you want to chat with. You can do it in person by meeting that person, or though any other communication mehtod. You can use the same hidden service (same public key and authentication key) to chat with multiple persons but this comes with the risk of sharing the same keys with everyone, and someone might use them later to spam you. Or, **the other person, with whom you want to chat with, can provide you his/her/their hidden service public key and authentication key** and you can use it too.
+Then, share the hidden service public key and authentication key with someone you want to chat with. You can do it in person by meeting that person, or through any other communication method. You can use the same hidden service (same public key and authentication key) to chat with multiple persons but this comes with the risk of sharing the same keys with everyone, and someone might use them later to spam you. Or, **the other person, with whom you want to chat with, can provide you with his/her/their hidden service public key and authentication key** and you can use it too.
 
 ##### Step 2
 
@@ -176,9 +176,9 @@ Select option **2** to generate encryption keys for your chat. You need to share
 
 ##### Step 3
 
-Select option **3** to run your chat client. There you won't need to create any new encryption keys for chatting if you don't want to. Creating more than one keys will be very hard to manage and might be the reason of some problems in future.
+Select option **3** to run your chat client. There you won't need to create any new encryption keys for chatting if you don't want to. Creating more than one key will be very hard to manage and might be the reason of some problems in future.
 
-You will need to enter your or the other person's hidden service and server's **public key** and **authenticaion key** and also the other person's **public key for encryption** to chat with that person.
+You will need to enter your or the other person's hidden service and server's **public key** and **authentication key** and also the other person's **public key for encryption** to chat with that person.
 
 #### How to Create an Anonymous (.onion) Webpage
 
@@ -189,10 +189,10 @@ In the 'onymochat' directory, go to the 'onion_webpage' directory. Edit the **in
 
 ##### Step 2
 
-Select option **4** from the main menu. You can generate a new URL for your .onion webpage and save the private key of that webpage to resume the webpage later with the same URL. Or, you can use a pre-saved private key to resume your website with a perticular URL you've generated before. 
+Select option **4** from the main menu. You can generate a new URL for your .onion webpage and save the private key of that webpage to resume the webpage later with the same URL. Or, you can use a pre-saved private key to resume your website with a particular URL you've generated before. 
 #### Generate QR Codes for Encryption Keys
 
-Option **4**, **5**, **6**, and **7** is to generate QR codes for different keys used in Onymochat. This QR codes are saved in ```\files\qr_codes```. You can print them and share with other people you want to communicate with. 
+Option **4**, **5**, **6**, and **7** is to generate QR codes for different keys used in Onymochat. These QR codes are saved in ```\files\qr_codes```. You can print them and share them with other people you want to communicate with. 
 
 #### Exit Program
 
