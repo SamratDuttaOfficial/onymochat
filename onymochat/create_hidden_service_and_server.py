@@ -7,10 +7,13 @@ from stem.process import launch_tor_with_config
 from generate_qr import generate_qr
 
 # For flask server
-from flask import Flask
+from flask import Flask, request
 import datetime
 import urllib.parse
 import logging
+
+# Generating keys
+import keys_manager
 
 sys.tracebacklimit = 0
 # Hiding traceback errors, cause it throws a traceback error every time we throw an exception in the stop() function.
@@ -49,18 +52,20 @@ def print_lines(line):
 
 
 # To get messages from base URL of the server
+
 @server.route('/')  # Routing is used to map the specific URL with the associated function
 def index():
     return line_sep.join(messages)
 
 
-# To get messages from /user/message_text URL of the server
-@server.route('/<username>/<message_text>')
-def get_message(username, message_text):
-    username = urllib.parse.unquote(username)
-    message_text = urllib.parse.unquote(message_text)
-    time = str(datetime.datetime.now())
-    messages.append(msg_sep.join([user_sep.join([time, username]), message_text]))
+@server.route('/send')
+def query_example():
+    # if key doesn't exist, returns None
+    encrypted_text = request.args.get('encrypted_text')
+    unique_key = request.args.get('unique_key')
+    unique_key = urllib.parse.unquote(unique_key)
+    encrypted_text = urllib.parse.unquote(encrypted_text)
+    messages.append(msg_sep.join([unique_key, encrypted_text]))
     return line_sep.join(messages)
 
 
@@ -156,70 +161,40 @@ def create_hidden_service_and_server():
         controller.remove_hidden_service(hidden_service_id)
         print('- Closed a hidden service with ID %s', hidden_service_id)
 
+    using_saved_keys = True
+    server_name = "temporary_page"
     try:
-        hidden_service_private_key_file = open(dir_path + "hidden_service_private_key.txt", "r+")
-        hidden_service_private_key = str(hidden_service_private_key_file.read())
-        if hidden_service_private_key != "":    # It it's not blank
-            while True:
-                use_saved_keys = input(
-                    "\nPreviously saved private key is found for your hidden service. Keep using it? (Y/N): ")
-                if (use_saved_keys == "Y") | (use_saved_keys == "y"):
-                    break
-                elif (use_saved_keys == "N") | (use_saved_keys == "n"):
-                    hidden_service_private_key = ""
-                    break
-                else:
-                    print("Invalid input! Try again. Input Y or N only.")
-        else:
-            hidden_service_private_key = str(input("\nInput private key for your hidden service "
-                                                   "(leave empty to create one): "))
-    except:
+        hidden_service_private_key, server_name = keys_manager.save_open_keys(filename="hidden_service_private_keys.txt",
+                                                                              do_what="deploy",
+                                                                              key_type="private key",
+                                                                              name_type="hidden service and server",
+                                                                              extra_stmt=" (leave empty to create one)")
+    except Exception as e:
+        using_saved_keys = False
+        if str(e) != "Use private key without saving.":
+            print("Some error occurred. " + str(e))
         hidden_service_private_key = str(input("\nInput private key for your hidden service "
                                                "(leave empty to create one): "))
+
     if hidden_service_private_key == "":
         hidden_service_private_key = None
 
-    try:
-        hidden_service_authentication_key_file = open(dir_path + "hidden_service_authentication_key.txt", "r+")
-        hidden_service_auth_key = str(hidden_service_authentication_key_file.read())
-        if hidden_service_auth_key != "":   # If it's not blank
-            while True:
-                use_saved_keys = input(
-                    "\nPreviously saved authentication key is found for your hidden service. Keep using it? (Y/N): ")
-                if (use_saved_keys == "Y") | (use_saved_keys == "y"):
-                    break
-                elif (use_saved_keys == "N") | (use_saved_keys == "n"):
-                    hidden_service_auth_key = ""
-                    break
-                else:
-                    print("Invalid input! Try again. Input Y or N only.")
-        else:
-            hidden_service_auth_key = str(input("\nInput authentication key for your hidden service "
-                                                "(leave empty to create one): "))
-    except:
-        hidden_service_auth_key = str(input("\nInput authentication key for your hidden service "
-                                            "(leave empty to create one): "))
-    if hidden_service_auth_key == "":
-        hidden_service_auth_key = None
-
-    print('\nInitiating/resuming a hidden service (V2 Onion Service). Please wait...')
+    print('\nInitiating/resuming a hidden service (V3 Onion Service). Please wait...')
 
     try:
         if hidden_service_private_key:  # When user inputs a pre-saved private key.
             hidden_service = controller.create_ephemeral_hidden_service(
                 {80: 6969},
                 await_publication=True,
-                key_type='RSA1024',
+                key_type='ED25519-V3',
                 key_content=hidden_service_private_key,
-                basic_auth={'onymochat': hidden_service_auth_key},
                 detached=True
             )
         else:  # When user doesn't input a pre-saved private key.
             hidden_service = controller.create_ephemeral_hidden_service(
                 {80: 6969},
                 await_publication=True,
-                key_content='RSA1024',
-                basic_auth={'onymochat': hidden_service_auth_key},
+                key_content='ED25519-V3',
                 detached=True
             )
         # Flask automatically runs on port 5000.
@@ -229,11 +204,6 @@ def create_hidden_service_and_server():
             if "Failed to decode RSA key" in str(exc):
                 print("Error in decoding RSA key. The pre-saved/entered private key might be corrupted. "
                       "\nTry generating a hidden service with a different private key or by generating a new one.")
-            elif "Authorization cookie has wrong length" in str(exc):
-                print("Authentication key has wrong length. The pre-saved/entered authentication key might be "
-                      "corrupted. "
-                      "\nTry generating a hidden service with a different authentication key or by "
-                      "generating a new one.")
             else:
                 print(exc)
                 print("Try closing/killing Tor first, then try again later."
@@ -254,65 +224,46 @@ def create_hidden_service_and_server():
     * torrc is located at (For Windows) 'Tor Browser\\Browser\\TorBrowser\\Data\\Tor'
     '''
 
-    print("")
-    print('Successfully initialized a hidden service!')
+    print('\nSuccessfully initialized a hidden service!')
     print('\nHidden Service Public Key: ' + str(hidden_service.service_id))
-    if not hidden_service_auth_key:
-        # For authentication key
-        hidden_service_authentication_key = str(hidden_service.client_auth['onymochat'])
-        hidden_service_authentication_key_file = open(dir_path + "hidden_service_authentication_key.txt", "w")
-        hidden_service_authentication_key_file.write(hidden_service_authentication_key)
-        hidden_service_authentication_key_file.close()
-        print('\nAuthentication Key: ' + hidden_service_authentication_key)
-        generate_qr(hidden_service_authentication_key, "hidden_service_authentication_key")
-    else:
-        print('\nAuthentication Key: ' + hidden_service_auth_key)
+
     if not hidden_service_private_key:
         # For private key
         hidden_service_private_key = str(hidden_service.private_key)
-        hidden_service_private_key_file = open(dir_path + "hidden_service_private_key.txt", "w")
-        hidden_service_private_key_file.write(hidden_service_private_key)
-        hidden_service_private_key_file.close()
-        print('\nPrivate Key:\n\n' + hidden_service_private_key)
-        generate_qr(hidden_service_private_key, "hidden_service_private_key")
+        print('\nHidden Service Private Key: ' + hidden_service_private_key)
+        if using_saved_keys:
+            with open(dir_path + "hidden_service_private_keys.txt", "a+") as file_object:
+                # Move read cursor to the start of file.
+                file_object.seek(0)
+                # If file is not empty then append '\n'
+                data = file_object.read(100)
+                # Append text at the end of file
+                file_object.write(hidden_service_private_key)
+        generate_qr(hidden_service_private_key, "hidden_service_private_key_" + server_name)
         # For public key
-        hidden_service_public_key = str(hidden_service.service_id)
-        hidden_service_public_key_file = open(dir_path + "hidden_service_public_key.txt", "w")
-        hidden_service_public_key_file.write(hidden_service_public_key)
-        hidden_service_public_key_file.close()
-        generate_qr(hidden_service_public_key, "hidden_service_public_key")
+        hidden_service_public_key = str(hidden_service.service_id) + ".onion"
+        generate_qr(hidden_service_public_key, "hidden_service_public_key_" + server_name)
+    else:
+        print('\nHidden Service Private Key: ' + hidden_service_private_key)
 
-    print("\nShare the hidden service public key and authentication key with the persons you want to chat with."
-          "\nYou can use the same hidden service (same public key and authentication key) to chat with multiple "
-          "person(s) but this comes with the risk of sharing the same keys with everyone, "
-          "and someone might use them later to spam you. "
-          "\nSave the private keys of each hidden service somewhere. Use them later to resume those hidden services.")
-    print('\nSave your authentication key in a safe place for future use.'
-          '\nAuthentication key is important for users to connect to the hidden service.'
-          '\nIf you lose the authentication key, a new authentication key can be generated next time when you run the '
-          'program. Then you will have to share the new authentication key with the person(s) you want to chat with.'
-          '\nUsing the private key you can create a hidden service with the same ID in future.'
-          '\nCAUTION: '
+    print("\nShare the hidden service public key key with the persons you want to chat with.")
+    print("You can use the same hidden service (same public key) to chat with multiple person(s) but this comes with "
+          "the risk of sharing the same key with everyone, and someone might use them later to spam you.")
+    print("Save the private keys of each hidden service somewhere. Use them later to resume those hidden services.")
+    print('CAUTION: '
           'If you lose the private key, you will never be able to generate a hidden service with the same ID again!'
           '\nCAUTION: Do not share your private key with anyone. '
           'Otherwise they too will be able to create a hidden service with the same ID as yours!'
           '\n')
-    print("The images of the QR codes for your hidden service's private key, public key, and authentication key are "
+    print("The images of the QR codes for your hidden service's private key and public key are "
           "saved in the location " + path + "files/qr_codes/")
     print("You can take a print of the images as a backup for future use. Scanning the QR with any QR code scanner "
           "reveals the content.\n")
-
-    onion_domain = hidden_service.service_id + '.onion'
-
-    if hidden_service_auth_key:
-        controller.set_conf('HidServAuth', '%s %s' % (onion_domain, hidden_service_auth_key))
-    else:
-        controller.set_conf('HidServAuth', '%s %s' % (onion_domain, hidden_service.client_auth['onymochat']))
-
     print('Server: PRESS CTRL+C TO CLOSE THE SERVER.'
           '\n\nNot closing the server properly might raise other problems in future.'
           '\nYou might have to press CTRL+C several times in order to close the server.'
           '\nClosing the server will delete all of the existing chat history permanently.\n')
+
     server.run(port=6969)  # Running Flask on port 6969 instead of the default port 5000.
 
     # The Flask server closes when Ctrl + c is pressed. After the server closes, everything else will close too.

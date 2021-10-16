@@ -3,6 +3,8 @@ from create_hidden_service_and_server import *
 from create_onion_page import *
 from generate_qr import *
 from crypto import *
+from keys_manager import *
+import os
 
 path = os.path.dirname(os.path.realpath(__file__)) + "/"
 tor_path_file_path = path + "files/others/tor_path_file.txt"
@@ -13,9 +15,9 @@ main_menu = "\nMAIN MENU" \
             "\n2. Generate encryption keys for chat" \
             "\n3. Run chat client" \
             "\n4. Create onion webpage" \
-            "\n5. Generate QR codes for chat server" \
-            "\n6. Generate QR codes for onion page" \
-            "\n7. Generate QR codes for your encryption keys" \
+            "\n5. Generate QR codes for your encryption keys" \
+            "\n6. Generate QR codes for other keys" \
+            "\n7. Delete all saved keys" \
             "\n8. Exit"
 
 if __name__ == '__main__':
@@ -83,11 +85,40 @@ if __name__ == '__main__':
                     print(e)
                     print("Some error occurred!")
         elif choice == "5":
-            generate_hidden_service_qr()
-        elif choice == "6":
-            generate_onion_page_qr()
-        elif choice == "7":
             generate_encryption_keys_qr()
+        elif choice == "6":
+            generate_other_key_qr()
+        elif choice == "7":
+            print("Once you delete all of the keys saved in your system, you can't get them back again. "
+                  "You'll lose contacts with multiple people.")
+            while True:
+                proceed = input("Do you want to proceed? (Y/N): ")
+                if (proceed == "Y") | (proceed == "y"):
+                    while True:
+                        proceed = input("Are you absolutely sure (there's no going back)? (Y/N): ")
+                        if (proceed == "Y") | (proceed == "y"):
+                            delete_all_keys("onion_page_private_keys.txt")
+                            delete_all_keys("hidden_service_private_keys.txt")
+                            delete_all_keys("chat_public_keys.txt")
+                            delete_all_keys("chat_client_public_keys.txt")
+                            files_in_directory = os.listdir(path + "files/qr_codes")
+                            filtered_png_files = [file for file in files_in_directory if file.endswith(".png")]
+                            for file in filtered_png_files:
+                                    path_to_file = os.path.join(path + "files/qr_codes", file)
+                                    os.remove(path_to_file)
+                            print("Deleted all saved QR codes")
+                            break
+                        elif (proceed == "N") | (proceed == "n"):
+                            print("Not deleting anything.")
+                            break
+                        else:
+                            print("Invalid choice!")
+                    break
+                elif (proceed == "N") | (proceed == "n"):
+                    print("Not deleting anything.")
+                    break
+                else:
+                    print("Invalid choice!")
         elif choice == "8":
             break
         else:

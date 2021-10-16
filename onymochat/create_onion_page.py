@@ -11,6 +11,9 @@ import logging
 # Generating QR
 from generate_qr import generate_qr
 
+# Generating keys
+import keys_manager
+
 # Some tor tutorials: https://stem.torproject.org/api/control.html
 # Tutorial has functions like controller.create_ephemeral_hidden_service
 # Python controller for TOR: https://github.com/torproject/stem
@@ -141,38 +144,33 @@ def create_onion_page():
         controller.remove_hidden_service(hidden_service_id)
         print('- Closed a hidden service with ID %s', hidden_service_id)
 
+    using_saved_keys = True
+    onion_page_name = "temporary_page"
     try:
-        hidden_service_key_file = open(dir_path + "onion_page_private_key.txt", "r+")
-        hidden_service_private_key = str(hidden_service_key_file.read())
-        if hidden_service_private_key != "":    # It it's not blank
-            while True:
-                use_saved_keys = input(
-                    "\nPreviously saved private key is found for your onion page. Keep using it? (Y/N): ")
-                if (use_saved_keys == "Y") | (use_saved_keys == "y"):
-                    break
-                elif (use_saved_keys == "N") | (use_saved_keys == "n"):
-                    hidden_service_private_key = ""
-                    break
-                else:
-                    print("Invalid input! Try again. Input Y or N only.")
-        else:
-            hidden_service_private_key = str(input("\nInput private key for your hidden service "
-                                                   "(leave empty to create one):\n"))
-    except:
-        hidden_service_private_key = str(input("\nInput private key for your hidden service "
-                                               "(leave empty to create one):\n"))
-    if hidden_service_private_key == "":
-        hidden_service_private_key = None
+        onion_page_private_key, onion_page_name = keys_manager.save_open_keys(filename="onion_page_private_keys.txt",
+                                                                              do_what="deploy",
+                                                                              key_type="private key",
+                                                                              name_type="onion page",
+                                                                              extra_stmt=" (leave empty to create one)")
+    except Exception as e:
+        using_saved_keys = False
+        if str(e) != "Use private key without saving.":
+            print("Some error occurred. " + str(e))
+        onion_page_private_key = str(input("\nEnter the private key for your onion page (leave empty to create one):"
+                                           "\n"))
+
+    if onion_page_private_key == "":
+        onion_page_private_key = None
 
     print('\nInitiating/resuming a hidden service (V3 Onion Service). Please wait...')
 
     try:
-        if hidden_service_private_key:  # When user inputs a pre-saved private key.
+        if onion_page_private_key:  # When user inputs a pre-saved private key.
             hidden_service = controller.create_ephemeral_hidden_service(
                 {80: 5000},
                 await_publication=True,
                 key_type='ED25519-V3',
-                key_content=hidden_service_private_key,
+                key_content=onion_page_private_key,
                 detached=True
             )
         else:  # When user doesn't input a pre-saved private key.
@@ -193,12 +191,12 @@ def create_onion_page():
                   "\n\t- $sudo killall tor")
             stop()
         else:
-            print(str(exc) + ". Please enter a proper authentication key and private key (if any).")
+            print("Some error occurred. Error: " + str(exc))
             stop()
 
     '''
     * key_content='RSA1024' is for Onion services V2. This method doesn't work with Onion version V3.
-    * ED25519-V3 is for Onion version V3. But it doesn't support client authentication.
+    * ED25519-V3 is for Onion version V3. But it doesn't support client authentication (probably).
     * The default version of newly created hidden services is based on the HiddenServiceVersion value in your torrc.
     * torrc is located at 'Tor Browser/Browser/TorBrowser/Data/Tor'
     '''
@@ -208,20 +206,25 @@ def create_onion_page():
     print("")
     print('Successfully initialized a hidden service!')
     print('\nOnion URL of Your Webpage: ' + onion_domain)
-    if not hidden_service_private_key:
+
+    if not onion_page_private_key:
         # For private key
         onion_page_private_key = str(hidden_service.private_key)
-        onion_page_private_key_file = open(dir_path + "onion_page_private_key.txt", "w")
-        onion_page_private_key_file.write(onion_page_private_key)
-        onion_page_private_key_file.close()
-        print('\nPrivate Key:\n\n' + onion_page_private_key)
-        generate_qr(onion_page_private_key, "onion_page_private_key")
+        print('\nOnion Page Private Key: ' + onion_page_private_key)
+        if using_saved_keys:
+            with open(dir_path + "onion_page_private_keys.txt", "a+") as file_object:
+                # Move read cursor to the start of file.
+                file_object.seek(0)
+                # If file is not empty then append '\n'
+                data = file_object.read(100)
+                # Append text at the end of file
+                file_object.write(onion_page_private_key)
+        generate_qr(onion_page_private_key, "onion_page_private_key_"+onion_page_name)
         # For public key (URL)
-        onion_page_public_key = str(hidden_service.service_id) + ".onion"
-        onion_page_public_key_file = open(dir_path + "onion_page_url.txt", "w")
-        onion_page_public_key_file.write(onion_page_public_key)
-        onion_page_public_key_file.close()
-        generate_qr(onion_page_public_key, "onion_page_url")
+        onion_page_url = str(hidden_service.service_id) + ".onion"
+        generate_qr(onion_page_url, "onion_page_url_"+onion_page_name)
+    else:
+        print('\nOnion Page Private Key: ' + onion_page_private_key)
 
     print('\nSave your private key in a safe place for future use.'
           '\nUsing the private key you can create the .onion web-page with the same URL in future.'
@@ -230,10 +233,14 @@ def create_onion_page():
           '\nCAUTION: Do not share your private key with anyone. '
           'Otherwise they too will be able to create the .onion web-page with the same URL as yours!'
           '\n')
-
+    print("The images of the QR codes for your onion page's private key and url are saved in the location " +
+          path + "files/qr_codes/")
+    print("You can take a print of the images as a backup for future use. Scanning the QR with any QR code scanner "
+          "reveals the content.\n")
     print('Server: PRESS CTRL+C TO CLOSE THE SERVER.'
           '\n\nNot closing the server properly might raise other problems in future.'
           '\nYou might have to press CTRL+C several times in order to close the server.\n')
+
     server.run()  # Running Flask on default port 5000.
 
     # The Flask server closes when Ctrl + c is pressed. After the server closes, everything else will close too.

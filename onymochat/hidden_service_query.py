@@ -22,7 +22,6 @@ class QueryHiddenService:
         domain = self.domain + route
         # An example: domain = z6m7z3bcgnok6zxg.onion/user/sam/message/hello there
 
-        domain = urllib.parse.quote(domain)
         domain = "http://" + domain
 
         output = io.BytesIO()

@@ -1,22 +1,25 @@
 import gc
 import threading
 import datetime
-from random import random
+import urllib
+import random
 from hidden_service_query import QueryHiddenService
-from stem.control import Controller
-import stem
 from stem.process import launch_tor_with_config
 import os
 import time
 import tkinter
 import tkinter.scrolledtext
 import crypto
+import keys_manager
+import sys
+# from stem.control import Controller # We needed it for Onion Service version 2
+# import stem # We needed it for Onion Service version 2
 
 # extra
 import socks  # SocksiPy module
 import socket
 
-# sys.tracebacklimit = 0
+sys.tracebacklimit = 0
 # Hiding traceback errors, cause it throws a traceback error every time we throw an exception in the stop() function.
 
 path = os.path.dirname(os.path.realpath(__file__)) + "/"
@@ -27,11 +30,10 @@ CONTROL_PORT = 9051
 global tor
 tor = None
 
-user_sep = '#USERNAME#'  # User separator.
 msg_sep = '#MESSAGE#'  # Message separator.
 line_sep = '#NEW_LINE#'  # Line separator.
-timestamps = []
-special_keywords = [user_sep, msg_sep, line_sep, '\n']
+unique_key_list = []
+special_keywords = [msg_sep, line_sep, '\n']
 
 global gui_done
 global running
@@ -52,23 +54,20 @@ def print_lines(line):
 
 def update_chat(messages):
     global text_area
-    global timestamps
+    global unique_key_list
 
     new_messages = []  # Starting with a fresh list every time.
     for message in messages:
         if message:
             try:
-                time_sent, username_and_text = message.split(user_sep)
-                if time_sent not in timestamps:
-                    timestamps.append(time_sent)
-                    username, text = username_and_text.split(msg_sep)
-                    time_sent = time_sent[:-10]  # Cutting off extra stuffs.
-                    if username != user:
-                        text = crypto.decrypt(text, private_key)
-                        text = text[:-4]  # Last 4 characters are just for a new line.
-                        new_messages.append('[' + str(time_sent) + '] ' + str(username) + ': ' + str(text))
+                unique_key, text = message.split(msg_sep)
+                if unique_key not in unique_key_list:
+                    unique_key_list.append(unique_key)
+                    text = crypto.decrypt(text, private_key)
+                    text = text[:-5]  # Last 5 characters are just for a new line.
+                    new_messages.append(str(text))
             except ValueError as error:
-                if "Incorrect decryption" not in str(error):
+                if ("Incorrect decryption" not in str(error)) & ("Ciphertext with incorrect length" not in str(error)):
                     print('Error: %s' % error)
 
     if gui_done:
@@ -81,12 +80,9 @@ def update_chat(messages):
 
 def insert_sent(message):
     global text_area
-    global timestamps
 
-    time_sent = str(datetime.datetime.now())
-    time_sent = time_sent[:-10]  # Cutting off extra stuffs.
-    message = message[:-4]  # Last 4 characters are just for a new line.
-    new_message = '[' + str(time_sent) + '] ' + str(user) + ': ' + str(message)
+    message = message[:-5]  # Last 5 characters are just for a new line.
+    new_message = str(message)
 
     if gui_done:
         text_area.config(state='normal')
@@ -112,20 +108,35 @@ def send():
     global others_public_key
     global urllib_query
     global disconnected
+    global user
+    global unique_key_list
+
+    time_sent = str(datetime.datetime.now())
+    time_sent = time_sent[:-10]  # Cutting off extra stuffs.
 
     # To see how urllib queries are used to send messages see the run_hidden_service_and_serve.py file.
     message = input_area.get('1.0', 'end')  # this means get the whole text
     for keywrd in special_keywords:
         message = message.replace(keywrd, ' ... ')  # Remove special keywords.
 
-    if len(message) >= 80:
-        # print("Input text is too long. Maximum allowed length is 80 characters (a new line is 5 characters long).")
-        insert_text("Maximum allowed length is 80 characters (a new line is 5 characters long).")
+    if len(message) >= 435:
+        # Max len for encryption is 470. 10 chars reserved for username and 21 for date-time, punctuations and spaces.
+        insert_text("Maximum allowed length is 435 characters (a new line is 5 characters long).")
         return
+    if len(message) < 6:    # Input box is blank. Min chars is 5 because it adds " ... " to the end automatically
+        return
+
+    message = '[' + str(time_sent) + '] ' + user + ': ' + message
+    while True:
+        unique_key = str(random.randint(100000, 999999))
+        if unique_key not in unique_key_list:
+            unique_key_list.append(unique_key)
+            break
 
     enc_success = True
     try:
         enc_message = crypto.encrypt(message, others_public_key)  # encrypted with the other person's public key.
+        enc_message = urllib.parse.quote(enc_message)   # This makes spaces %20 and other stuffs like that.
     except ValueError as e:
         print("The public key of the person you want to chat with is probably not a valid key."
               "\nPlease enter a valid public key.")
@@ -134,14 +145,15 @@ def send():
     if not enc_success:
         stop()
 
-    route = '/%s/%s' % (user, enc_message)  # route is like '/<username>/<message_sent>'
+    # Route is like '/send?unique_key=596578&encrypted_text=HY^shd0*
+    route = '/send?unique_key=%s&encrypted_text=%s' % (unique_key, enc_message)
     if not disconnected:
         messages_string = urllib_query.query(route)
         if 'Unable to reach' in messages_string:
             disconnected = True
             if running:
                 # Sometimes running becomes false and still it gets printed. So check it beforehand.
-                print("Unable to reach the server. Make sure the hidden service is still running on the host computer.")
+                print("Unable to reach the server.", end="")
             check_count = 0
             while check_count < 10:
                 if running:
@@ -276,8 +288,11 @@ def stop():
     except NameError:
         print("No window to be closed.")
     gui_done = False
+    # This code was used when we used Onion service version 3
+    '''
     controller.reset_conf()
     print('Controller reset.')
+    '''
     socks.setdefaultproxy()  # Resetting default proxy
     if tor:
         tor.terminate()
@@ -349,16 +364,12 @@ def run_chat_client():
     except Exception as exc:
         print(exc)
 
-    controller = Controller.from_port()
-    controller.authenticate()
-
     socks_port = SOCKS_PORT
 
     # Set socks proxy and wrap the urllib module
     socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, '127.0.0.1', socks_port)
     socket.socket = socks.socksocket
     socket.getaddrinfo = getaddrinfo
-
 
     try:
         public_key, private_key = crypto.import_keys()
@@ -370,21 +381,34 @@ def run_chat_client():
                 print("An error occurred. Make sure you have entered a correct private key generated by Onymochat.")
                 stop()
 
-    hidden_service_id = input("Hidden Service Public Key: ")
-    hidden_service_auth = input("Authentication Key: ")
-
     try:
-        controller.set_conf('HidServAuth', '%s.onion %s' % (hidden_service_id, hidden_service_auth))
-    except stem.InvalidRequest:
-        print('Failed to configure client authorization for hidden services. '
-              '\nMake sure the information you entered are correct.')
-        stop()
+        hidden_service_id, hidden_service_name = keys_manager.save_open_keys(filename="chat_client_public_keys.txt",
+                                                                             do_what="connect to",
+                                                                             key_type="public key",
+                                                                             name_type="hidden service and server for "
+                                                                                       "chat client")
+    except Exception as e:
+        if str(e) != "Use public key without saving.":
+            print("Some error occurred. " + str(e))
+        hidden_service_id = input("Hidden Service and Server Public Key: ")
 
-    user = input("Your username: ")
-    if user == "":
-        user = "User" + random(100, 500)
-
-    others_public_key = input("Input the public key of the person you want to chat with:\n")
+    while True:
+        user = input("\nYour username (less than 10 characters): ")
+        if len(user) <= 10:
+            if user == "":
+                user = "User" + str(random.randint(100, 500))
+            break
+        else:
+            print("Your username is too long. Try again.")
+    try:
+        others_public_key, other_person_name = keys_manager.save_open_keys(filename="chat_public_keys.txt",
+                                                                           do_what="chat with",
+                                                                           key_type="public key for chat",
+                                                                           name_type="person")
+    except Exception as e:
+        if str(e) != "Use public key for chat without saving.":
+            print("Some error occurred. " + str(e))
+        others_public_key = input("\nInput the public key of the person you want to chat with:\n")
 
     domain = hidden_service_id + '.onion'
     urllib_query = QueryHiddenService(domain, socks_port)
